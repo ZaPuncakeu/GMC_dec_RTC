@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">7
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-peer/9.9.3/simplepeer.min.js"></script>
+    <title>Video chat!</title>
+</head>
+<body>
+    <div style="display: flex; justify-content: space-around;">
+        <div>
+            <h1>You</h1>
+            <video width="500px" controls id="you"></video>
+            <br>
+            <button id='start-call'>Start call</button>
+            <h1>Your Offre</h1>
+            <textarea id="your-offer" cols="50" rows="20"></textarea>
+        </div>
+
+        <div>
+            <h1>Your partner</h1>
+            <video width="500px" controls id="partner"></video>
+            <br>
+            <button id="connect">Connect</button>
+            <h1>The Answer</h1>
+            <textarea id="partner-offer" cols="50" rows="20"></textarea>
+        </div>
+    </div>
+
+    <script>
+        let peer = null;
+        let myStream = null;
+        
+        // On récupère la video et l'audio à partir du PC
+        navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: true
+        }).then(stream => {
+            // On sauvegarde le flux vidéo
+            myStream = stream
+            setVideo('you', myStream);
+        })
+        .catch(err => {
+            console.error(err);
+        })
+        
+        document.getElementById('start-call').onclick = () => {
+            // On initie une communication
+            peer = new SimplePeer({
+                initiator: true,
+                stream: myStream,
+                trickle: false
+            })
+
+            // On attend le signal de l'initialisation
+            setEvents(peer);
+        }
+
+        document.getElementById('connect').onclick = () => {
+            // On vérifie la nature du client
+            // Si c'est celui qui a initié la communication donc ce n'est pas la peine 
+            // de recréer
+            // Si c'est celui qui va recevoir l'offre 
+            if(!peer) {
+                // alors on crée un nouveau peer avec initiator = false car
+                // ce n'est pas lui qui va initier la communication 
+                peer = new SimplePeer({
+                    initiator: false,
+                    stream: myStream,
+                    trickle: false
+                })
+            }
+
+            peer.signal(JSON.parse(document.getElementById('partner-offer').value))
+            setEvents(peer);
+        }
+
+        function setEvents(p) {
+            p.on('signal', data => {
+                // une fois que le signal de l'initialisation est envoyé
+                // on récupère l'offre générée et on le sauvgarde dans un textarea
+                document.getElementById('your-offer').value = JSON.stringify(data);
+            })
+
+            p.on('error', err => {
+                console.error(err);
+            })
+
+            p.on('stream', stream => {
+                setVideo('partner', stream);
+            })
+        }
+
+        // Une fonction qui insère un flux vidéo dans la balise video
+        function setVideo(id, stream){
+            const vid = document.getElementById(id);
+            vid.srcObject = stream;
+            vid.addEventListener('loadedmetadata', () => {
+                // Si la balise vidéo est la mienne, je mute le stream
+                // pour ne pas entendre notre propre voix
+
+                if(id == "you"){
+                    vid.muted = true;
+                }
+
+                vid.play();
+            })            
+        }
+    </script>
+</body>
+</html>
